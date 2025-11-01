@@ -1,0 +1,5 @@
+{
+  "name": "AI Helpdesk Bot",
+  "description": "An intelligent helpdesk bot powered by Gemini that answers user queries based on a knowledge base and allows escalation to a ticket system for human agents.",
+  "requestFramePermissions": []
+}
