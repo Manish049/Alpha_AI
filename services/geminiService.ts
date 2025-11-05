@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Message } from '../types';
+import { Message, MessageAuthor } from '../types';
 import { KNOWLEDGE_BASE } from '../constants';
 
 if (!process.env.API_KEY) {
@@ -36,34 +36,43 @@ export const getAiResponse = async (query: string, chatHistory: Message[]): Prom
   const relevantContext = findRelevantKB(query);
   
   const historyString = chatHistory
+    .slice(-10) // Keep history concise
     .map(msg => `${msg.author === 'user' ? 'User' : 'Bot'}: ${msg.text}`)
     .join('\n');
 
-  const prompt = `
-    You are an AI Helpdesk Bot for OnePlus products. Your goal is to answer user questions based ONLY on the provided knowledge base context. 
-    If the answer is not in the context, clearly state that you don't have enough information and suggest escalating to a human agent. 
-    Be helpful, polite, and concise. Do not use any information you know outside of the provided context.
-    After providing a helpful answer, ask if there is anything else you can help with.
+  const systemInstruction = `You are "Roboto Ai", a friendly and highly knowledgeable customer support assistant for OnePlus devices. 
+Your primary goal is to resolve user issues accurately using ONLY the information provided in the "KNOWLEDGE BASE CONTEXT".
+- NEVER use any external knowledge. If the answer isn't in the provided context, you MUST state that you don't have the information and recommend escalating to a human agent.
+- Be empathetic and polite. Acknowledge the user's issue before providing a solution.
+- Keep your answers clear, concise, and easy to understand. Use bullet points or numbered lists for steps.
+- When you reference a specific knowledge base article, you MUST wrap its ID in a special tag like this: [KB:KB101]. For example: "According to article [KB:KB101], you might be eligible for a free screen replacement."
+- After providing a solution, always ask if the user needs further assistance.
+- Do not make up information, policies, or procedures.`;
 
+  const contents = `
     KNOWLEDGE BASE CONTEXT:
     ---
     ${relevantContext}
     ---
 
-    CONVERSATION HISTORY:
+    RECENT CONVERSATION HISTORY:
     ---
     ${historyString}
     ---
 
     CURRENT USER QUESTION: "${query}"
 
-    Based on all the above, provide your response:
+    Based strictly on the provided knowledge base and conversation history, provide your response.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: contents,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: 0.5,
+      },
     });
     return response.text;
   } catch (error) {
@@ -77,13 +86,21 @@ export const createTicketSummary = async (chatHistory: Message[]): Promise<strin
     return "No conversation history.";
   }
   
-  const historyString = chatHistory
+  const cleanHistory = chatHistory.filter(msg => msg.author !== MessageAuthor.SYSTEM);
+  const historyString = cleanHistory
     .map(msg => `${msg.author === 'user' ? 'User' : 'Bot'}: ${msg.text}`)
     .join('\n');
 
   const prompt = `
-    Summarize the following user support conversation into a concise ticket title/summary (max 15 words). 
-    Focus on the core problem the user is facing.
+    Analyze the following support conversation. Your task is to create a clear, concise, and action-oriented ticket summary for a human agent.
+    The summary should be a single sentence, no more than 15 words.
+    It must capture the user's primary issue and the product involved.
+    
+    Example:
+    CONVERSATION:
+    User: My OnePlus 11 screen has a green line. I updated it and it's still there.
+    Bot: I see. For out-of-warranty devices, OnePlus may offer a free screen replacement.
+    SUMMARY: User reports green line on OnePlus 11 display after software update.
 
     CONVERSATION:
     ---
@@ -97,8 +114,11 @@ export const createTicketSummary = async (chatHistory: Message[]): Promise<strin
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
+      config: {
+        temperature: 0.2,
+      },
     });
-    return response.text.trim();
+    return response.text.trim().replace(/\n/g, ' ');
   } catch (error) {
     console.error("Error creating ticket summary:", error);
     throw new Error("Failed to summarize ticket.");

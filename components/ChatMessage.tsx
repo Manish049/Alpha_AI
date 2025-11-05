@@ -4,9 +4,10 @@ import { Message, MessageAuthor } from '../types';
 interface ChatMessageProps {
   message: Message;
   onFeedback: (messageId: string, feedback: 'up' | 'down') => void;
+  onKbLinkClick: (kbId: string) => void;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFeedback }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFeedback, onKbLinkClick }) => {
   const isUser = message.author === MessageAuthor.USER;
   const isBot = message.author === MessageAuthor.BOT;
   const isSystem = message.author === MessageAuthor.SYSTEM;
@@ -43,6 +44,30 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFeedback }) => {
     </svg>
   );
 
+  const renderMessageContent = () => {
+    const text = message.text;
+    // Regex to find and split by [KB:KBXXX] tags, keeping the delimiter
+    const parts = text.split(/(\[KB:[^\]]+\])/g);
+
+    return parts.map((part, index) => {
+      const match = part.match(/\[KB:(KB\d+)\]/);
+      if (match) {
+        const kbId = match[1];
+        return (
+          <a
+            key={index}
+            href="#"
+            onClick={(e) => { e.preventDefault(); onKbLinkClick(kbId); }}
+            className="text-cyan-400 font-semibold underline hover:text-cyan-300 transition-colors"
+          >
+            {kbId}
+          </a>
+        );
+      }
+      return part; // Return the text part as is
+    });
+  };
+
   if (isSystem) {
       return (
           <div className={containerStyles[message.author]}>
@@ -60,7 +85,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFeedback }) => {
                 <AuthorLabel />
             </div>
             <div className={`${baseClasses} ${authorStyles[message.author]}`}>
-                <p className="text-sm" dangerouslySetInnerHTML={{ __html: message.text.replace(/\n/g, '<br />') }}></p>
+                <div className="text-sm whitespace-pre-wrap">{renderMessageContent()}</div>
             </div>
              <div className={`flex items-center space-x-2 mt-2 px-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 {isBot && (

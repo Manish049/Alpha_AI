@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, MessageAuthor } from '../types';
-import { getAiResponse } from '../services/geminiService';
+import { Message, MessageAuthor, KBArticle } from '../types';
 import ChatMessage from './ChatMessage';
+import { KNOWLEDGE_BASE } from '../constants';
 
 interface EscalationDetails {
   message: string;
@@ -13,7 +13,11 @@ interface EscalationDetails {
 }
 
 interface ChatViewProps {
+  messages: Message[];
+  onSendMessage: (input: string) => Promise<void>;
+  isLoading: boolean;
   onEscalate: (query: string, chatHistory: Message[], escalationDetails: EscalationDetails) => Promise<number>;
+  onFeedback: (messageId: string, feedback: 'up' | 'down') => void;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -36,67 +40,39 @@ const RobotIcon = () => (
 );
 
 
-const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'initial',
-      author: MessageAuthor.BOT,
-      text: "Hello! I'm Roboto Ai. How can I assist you with your OnePlus device today?",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+const ChatView: React.FC<ChatViewProps> = ({ messages, onSendMessage, isLoading, onEscalate, onFeedback }) => {
   const [userInput, setUserInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [showEscalateButton, setShowEscalateButton] = useState(false);
   const [isEscalateModalVisible, setIsEscalateModalVisible] = useState(false);
   const [escalationMessage, setEscalationMessage] = useState('');
   const [escalationFile, setEscalationFile] = useState<File | null>(null);
+  const [viewingKbArticle, setViewingKbArticle] = useState<KBArticle | null>(null);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isLoading && messages.length > 1 && messages[messages.length - 1].author === MessageAuthor.BOT) {
+      setShowEscalateButton(true);
+    }
   }, [messages, isLoading]);
 
   const handleSendMessage = async (e?: React.FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     if (!userInput.trim() || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      author: MessageAuthor.USER,
-      text: userInput,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setUserInput('');
-    setIsLoading(true);
     setShowEscalateButton(false);
-
-    const botResponseText = await getAiResponse(userInput, [...messages, userMessage]);
-    
-    const botMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      author: MessageAuthor.BOT,
-      text: botResponseText,
-      timestamp: new Date().toISOString(),
-    };
-    
-    setMessages(prev => [...prev, botMessage]);
-    setIsLoading(false);
-    setShowEscalateButton(true);
+    const textToSend = userInput;
+    setUserInput('');
+    await onSendMessage(textToSend);
   };
 
   const handleEscalateSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsLoading(true);
     setIsEscalateModalVisible(false);
 
     const lastUserMessage = [...messages].reverse().find(m => m.author === MessageAuthor.USER);
     if (!lastUserMessage) {
-        // This case should ideally not happen if the escalate button is only shown after a conversation
-        setIsLoading(false);
         return;
     }
 
@@ -110,37 +86,24 @@ const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
         };
     }
     
-    const ticketId = await onEscalate(lastUserMessage.text, messages, {
+    await onEscalate(lastUserMessage.text, messages, {
         message: escalationMessage,
         file: fileData,
     });
     
-    const systemMessage: Message = {
-      id: Date.now().toString(),
-      author: MessageAuthor.SYSTEM,
-      text: `Ticket #${ticketId} created. An agent will review it shortly.`,
-      timestamp: new Date().toISOString(),
-    };
-    
-    setMessages(prev => [...prev, systemMessage]);
     setEscalationMessage('');
     setEscalationFile(null);
-    setIsLoading(false);
     setShowEscalateButton(false);
   };
-
-  const handleFeedback = (messageId: string, feedback: 'up' | 'down') => {
-    setMessages(prevMessages =>
-      prevMessages.map(msg => {
-        if (msg.id === messageId) {
-          return { ...msg, feedback: msg.feedback === feedback ? undefined : feedback };
-        }
-        return msg;
-      })
-    );
+  
+  const handleKbLinkClick = (kbId: string) => {
+    const article = KNOWLEDGE_BASE.find(article => article.id === kbId);
+    if (article) {
+      setViewingKbArticle(article);
+    }
   };
 
-  const showWelcomeScreen = messages.length <= 1;
+  const showWelcomeScreen = messages.length <= 1 && messages[0]?.id === 'initial';
 
   return (
     <div className="flex flex-col h-full">
@@ -154,8 +117,8 @@ const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
              </div>
         ) : (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.slice(1).map(msg => (
-                <ChatMessage key={msg.id} message={msg} onFeedback={handleFeedback} />
+                {messages.map(msg => (
+                  msg.id !== 'initial' && <ChatMessage key={msg.id} message={msg} onFeedback={onFeedback} onKbLinkClick={handleKbLinkClick} />
                 ))}
                 {isLoading && !isEscalateModalVisible && (
                 <div className="flex justify-start">
@@ -163,7 +126,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
                         <div className="flex justify-start px-3">
                             <span className="text-xs font-bold text-gray-400 mb-1">Roboto Ai</span>
                         </div>
-                        <div className="max-w-xl p-3 rounded-lg shadow-sm bg-gray-700/50 text-gray-300 mr-auto flex items-center space-x-3">
+                        <div className="max-w-xl p-3 rounded-lg shadow-sm bg-gray-800/60 text-gray-200 mr-auto flex items-center space-x-3">
                             <div className="flex space-x-1.5 items-center justify-center">
                                 <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '-0.3s' }}></div>
                                 <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '-0.15s' }}></div>
@@ -245,6 +208,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
                 rows={4}
                 className="w-full p-3 bg-black/30 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:outline-none text-white placeholder-gray-500 border border-white/20"
                 aria-label="Additional details"
+                required
               />
               <div>
                 <label htmlFor="file-upload" className="w-full text-sm font-medium text-gray-300 bg-black/30 border border-dashed border-white/30 rounded-lg p-3 flex items-center justify-center cursor-pointer hover:bg-black/50 transition-colors">
@@ -268,6 +232,35 @@ const ChatView: React.FC<ChatViewProps> = ({ onEscalate }) => {
                 {isLoading ? 'Submitting...' : 'Submit Ticket'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {viewingKbArticle && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4"
+          onClick={() => setViewingKbArticle(null)}
+        >
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kb-modal-title"
+            className="bg-[#0A1F1F] border border-cyan-500/30 p-6 rounded-2xl shadow-2xl w-full max-w-2xl relative max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setViewingKbArticle(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              aria-label="Close modal"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h3 id="kb-modal-title" className="text-xl font-bold text-cyan-300 mb-4">{viewingKbArticle.title}</h3>
+            <div className="overflow-y-auto pr-2 text-gray-300 whitespace-pre-wrap text-sm">
+              {viewingKbArticle.content}
+            </div>
           </div>
         </div>
       )}

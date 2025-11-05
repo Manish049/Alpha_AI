@@ -17,6 +17,14 @@ export enum TicketStatus {
   CLOSED = 'Closed',
 }
 
+export interface User {
+  fullName: string;
+  email: string;
+  phone: string;
+  username: string;
+  password: string; // In a real app, this would be a hash
+}
+
 export interface Ticket {
   id: number;
   summary: string;
@@ -30,6 +38,7 @@ export interface Ticket {
     type: string;
     data: string; // Base64 encoded file
   };
+  createdBy: string; // The username of the user who created the ticket
 }
 
 export interface KBArticle {
