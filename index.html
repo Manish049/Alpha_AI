@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roboto Ai</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.1.3/24/outline/heroicons.min.css" integrity="sha512-V1BPIkKdaU1BN2kAXoJa5s0Sg24kRkfBfK2Mw06n3l2O8F8cc1y2SAo/P0a112rT+YF16N5v/Xh/k5KzI6YSAA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0"
+  }
+}
+</script>
+  <style>
+    :root {
+      --primary-cyan: #00f0ff;
+      
+      /* Light Mode Defaults */
+      --bg-color: #f3f4f6;
+      --text-main: #111827;
+      --glass-bg: rgba(255, 255, 255, 0.75);
+      --glass-border: rgba(0, 0, 0, 0.05);
+      --input-bg: rgba(255, 255, 255, 0.6);
+      --input-border: rgba(0, 0, 0, 0.1);
+      
+      /* Subtle light mode gradients */
+      --grad-1: rgba(0, 240, 255, 0.08);
+      --grad-2: rgba(100, 50, 255, 0.05);
+      --grad-3: rgba(0, 240, 255, 0.03);
+    }
+
+    .dark {
+      /* Dark Mode Overrides */
+      --bg-color: #0f0f0f;
+      --text-main: #ffffff;
+      --glass-bg: rgba(20, 20, 25, 0.6);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --input-bg: rgba(0, 0, 0, 0.2);
+      --input-border: rgba(255, 255, 255, 0.1);
+      
+      /* Dark mode gradients */
+      --grad-1: rgba(0, 240, 255, 0.15);
+      --grad-2: rgba(100, 50, 255, 0.08);
+      --grad-3: rgba(0, 240, 255, 0.05);
+    }
+    
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      background-image: 
+        radial-gradient(circle at 50% 0%, var(--grad-1) 0%, transparent 60%),
+        radial-gradient(circle at 85% 30%, var(--grad-2) 0%, transparent 50%),
+        radial-gradient(circle at 15% 70%, var(--grad-3) 0%, transparent 50%);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden; /* Prevent body scroll, handle in app */
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Subtle grain texture overlay */
+    body::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5); /* gray-400 equivalent */
+      border-radius: 10px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(107, 114, 128, 0.8);
+    }
+    .dark ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Hide scrollbar utility */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+
+    /* Animations */
+    @keyframes springUp {
+      0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+      60% { opacity: 1; transform: translateY(-5px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    
+    @keyframes slideInRight {
+      0% { opacity: 0; transform: translateX(20px); }
+      100% { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 10px rgba(0, 240, 255, 0.1); }
+      50% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.3); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .animate-spring-up {
+      animation: springUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      opacity: 0; /* Initial state hidden for animation to reveal */
+    }
+
+    .animate-float {
+      animation: float 6s ease-in-out infinite;
+    }
+
+    /* Stagger Delays */
+    .delay-75 { animation-delay: 75ms; }
+    .delay-100 { animation-delay: 100ms; }
+    .delay-150 { animation-delay: 150ms; }
+    .delay-200 { animation-delay: 200ms; }
+    .delay-300 { animation-delay: 300ms; }
+    .delay-500 { animation-delay: 500ms; }
+
+    /* Glassmorphism Utilities */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    .dark .glass-panel {
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    
+    .glass-input {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.8);
+      border-color: rgba(6, 182, 212, 0.5); /* Cyan-500 approx */
+      box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+    }
+    .dark .glass-input:focus {
+      background: rgba(0, 0, 0, 0.4);
+      border-color: rgba(0, 240, 255, 0.5);
+      box-shadow: 0 0 0 4px rgba(0, 240, 255, 0.1);
+    }
+    .glass-input::placeholder {
+      color: #9ca3af; /* Gray 400 */
+    }
+    .dark .glass-input::placeholder {
+      color: #6b7280; /* Gray 500 */
+    }
+
+    /* Interactive Elements */
+    .interactive-card {
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
+    }
+    .interactive-card:active {
+      transform: scale(0.98);
+    }
+    
+    .btn-press {
+      transition: transform 0.1s;
+    }
+    .btn-press:active {
+      transform: scale(0.95);
+    }
+  </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
